@@ -1,0 +1,108 @@
+## Установка простая, на VM из пакета.
+## Используем данные из https://www.kaggle.com/fivethirtyeight/uber-pickups-in-new-york-city
+## Загрузим данные с monogimport, протестируем производеительность индексов на достаточном объеме данных. 
+
+
+
+# mongo 
+> show dbs
+admin   0.000GB
+config  0.000GB
+local   0.000GB
+> use uber
+switched to db uber
+> db.dummy.insertOne({init: true})
+{
+        "acknowledged" : true,
+        "insertedId" : ObjectId("628bd8daa7992dc1df5e9471")
+}
+
+
+mongoimport --db uber --collection rawdata --type csv \
+  --fields "Dispatching_base_num.string(),Pickup_date.date_oracle(YYYY-MM-DD HH24:MI:SS),Affiliated_base_num.string(),locationID.auto()" \
+  --columnsHaveTypes --file "uber-raw-data-janjune-15.csv" --verbose 
+
+
+
+2022-05-23T22:24:44.422+0300    connected to: mongodb://localhost/
+2022-05-23T22:24:47.422+0300    [........................] uber.rawdata 11.8MB/526MB (2.2%)
+2022-05-23T22:24:50.424+0300    [#.......................] uber.rawdata 23.4MB/526MB (4.5%)
+...
+2022-05-23T22:27:01.382+0300    [########################] uber.rawdata 526MB/526MB (100.0%)
+2022-05-23T22:27:01.382+0300    14270479 document(s) imported successfully. 0 document(s) failed to import.
+
+# mongo
+> use uber
+switched to db uber
+> show collections
+dummy
+rawdata
+> db.rawdata.find().limit(10)
+{ "_id" : ObjectId("628d2f64ba98ae5016a970f1"), "Dispatching_base_num" : "B02617", "Pickup_date" : ISODate("2015-05-17T09:47:00Z"), "Affiliated_base_num" : "B02617", "locationID" : 141 }
+{ "_id" : ObjectId("628d2f64ba98ae5016a970f2"), "Dispatching_base_num" : "B02617", "Pickup_date" : ISODate("2015-05-17T09:47:00Z"), "Affiliated_base_num" : "B02617", "locationID" : 65 }
+...
+
+# cat script.txt
+use uber
+db.rawdata.count({ "locationID" : 141, "Pickup_date":{$gte : ISODate("2015-06-01"),$lte : ISODate("2015-07-01")} } )
+
+# time mongo < script.txt
+MongoDB shell version v4.4.14
+connecting to: mongodb://127.0.0.1:27017/?compressors=disabled&gssapiServiceName=mongodb
+Implicit session: session { "id" : UUID("53f3a3d9-4b9d-4df8-b932-7c14d99a8cd2") }
+MongoDB server version: 4.4.14
+switched to db uber
+37241
+bye
+
+real    0m7.708s
+user    0m0.082s
+sys     0m0.023s
+
+# mongo 
+> db.rawdata.createIndex({"Pickup_date":1})
+{
+        "createdCollectionAutomatically" : false,
+        "numIndexesBefore" : 1,
+        "numIndexesAfter" : 2,
+        "ok" : 1
+}
+exit
+
+#  time mongo < script.txt
+MongoDB shell version v4.4.14
+connecting to: mongodb://127.0.0.1:27017/?compressors=disabled&gssapiServiceName=mongodb
+Implicit session: session { "id" : UUID("36498e34-98ef-42d6-8d76-37a0d6d2776e") }
+MongoDB server version: 4.4.14
+switched to db uber
+37241
+bye
+
+real    0m3.946s
+user    0m0.069s
+sys     0m0.037s
+
+# mongo 
+> use uber
+switched to db uber
+> db.rawdata.createIndex({"locationID":1})
+{
+        "createdCollectionAutomatically" : false,
+        "numIndexesBefore" : 2,
+        "numIndexesAfter" : 3,
+        "ok" : 1
+}
+> exit
+
+#  time mongo < script.txt
+MongoDB shell version v4.4.14
+connecting to: mongodb://127.0.0.1:27017/?compressors=disabled&gssapiServiceName=mongodb
+Implicit session: session { "id" : UUID("7681e285-933f-451a-905f-da8ed268d418") }
+MongoDB server version: 4.4.14
+switched to db uber
+37241
+bye
+
+real    0m0.537s
+user    0m0.076s
+sys     0m0.027s
