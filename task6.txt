@@ -2,6 +2,9 @@
 test-host1
 test-host2
 test-host3
+Для экономии все на этих 3х серверах и shards и configs and query routers. 
+
+Запуск делал через systemd с именами сервисов : mongod - shards, mongod-cs - configs nodes.
 
 по портам: 27017-shards, 27019-config-servers, 27018 query-router
 
@@ -50,7 +53,7 @@ replication:
 );
 { "ok" : 1 }
 
-4. Add config server (for sharding cluster )
+4. Add config servers (for sharding cluster ) with authotization (create user as 2.2 section )
 create new conf and service on every host :
 ------------
 net:
@@ -151,46 +154,7 @@ sharding:
   configDB: rs-cs/test-host1:27019,test-host2:27019,test-host3:27019
 ------------
 
-6.2 Create systemd init :
-------------
-# /usr/lib/systemd/system/mongos.service
-[Unit]
-Description=Mongo Cluster Router
-Documentation=https://docs.mongodb.org/manual
-After=network-online.target
-Wants=network-online.target
-
-[Service]
-User=mongod
-Group=mongod
-Environment="OPTIONS=-f /etc/mongos.conf"
-EnvironmentFile=-/etc/sysconfig/mongos
-ExecStart=/usr/bin/mongos $OPTIONS
-ExecStartPre=/usr/bin/mkdir -p /var/run/mongodb
-ExecStartPre=/usr/bin/chown mongod:mongod /var/run/mongodb
-ExecStartPre=/usr/bin/chmod 0755 /var/run/mongodb
-PermissionsStartOnly=true
-PIDFile=/var/run/mongodb/mongos.pid
-Type=forking
-# file size
-LimitFSIZE=infinity
-# cpu time
-LimitCPU=infinity
-# virtual memory size
-LimitAS=infinity
-# open files
-LimitNOFILE=64000
-# processes/threads
-LimitNPROC=64000
-# locked memory
-LimitMEMLOCK=infinity
-# total threads (user+kernel)
-TasksMax=infinity
-TasksAccounting=false
-
-[Install]
-WantedBy=multi-user.target
-------------
+6.2 Create systemd init and start service :
 
 systemctl start mongos 
 
@@ -360,7 +324,7 @@ user    0m0.095s
 sys     0m0.031s
 
 
-Interesting, but in working only with one config node. 
+Interesting, but it working only with one config node. 
 Connect to cs db and check: 
 > rs.status()
 {
